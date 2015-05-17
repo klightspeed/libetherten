@@ -226,7 +226,7 @@ void __w5100_sock_rw_mem(uint8_t socknum, void *buf, int len, uint16_t optype, i
 void __w5100_sock_cmd(uint8_t socknum, uint8_t cmd);
 
 #define __w5100_write_byte(address,value,op) \
-    { \
+    do { \
         register uint16_t __address asm("r24") = (address); \
         register uint8_t __value asm("r22") = (value); \
         register uint8_t __op asm("r20") = (op); \
@@ -284,16 +284,19 @@ void __w5100_sock_cmd(uint8_t socknum, uint8_t cmd);
 #define w5100_write_mem(address,value,len) __w5100_rw_mem(address, value, len, W5100_OP_WRITE_RAM)
 #define w5100_write_mem_p(address,value,len) __w5100_rw_mem(address, value, len, W5100_OP_WRITE_FLASH)
 #define w5100_read_mem(address,value,len) __w5100_rw_mem(address, value, len, W5100_OP_READ_RAM)
+
 #define w5100_sock_write(socknum,value,len,offset) __w5100_sock_rw_mem(socknum, value, len, W5100_OP_WRITE_RAM, offset)
 #define w5100_sock_write_p(socknum,value,len,offset) __w5100_sock_rw_mem(socknum, value, len, W5100_OP_WRITE_FLASH, offset)
 #define w5100_sock_read(socknum,value,len,offset) __w5100_sock_rw_mem(socknum, value, len, W5100_OP_READ_RAM, offset)
 #define w5100_sock_rxavail(socknum) w5100_read_word(W5100_SOCK_REGADDR(socknum, rxrcvd))
 #define w5100_sock_txfree(socknum) w5100_read_word(W5100_SOCK_REGADDR(socknum, txfree))
+
+#define w5100_recv(socknum,value,len,offset) __w5100_sock_rw_mem(socknum, value, len, W5100_OP_RECV_RAM, offset)
 #define w5100_send(socknum,data,len,offset) __w5100_sock_rw_mem(socknum, data, len, W5100_OP_SEND_RAM, offset)
 #define w5100_send_p(socknum,data,len,offset) __w5100_sock_rw_mem(socknum, data, len, W5100_OP_SEND_FLASH, offset)
 
 #define w5100_sock_cmd(socknum,cmd) \
-    { \
+    do { \
         register uint8_t __socknum asm("r24") = (socknum); \
         register uint8_t __cmd asm("r22") = (cmd); \
         asm volatile ( "call __w5100_sock_cmd" : "+r" (__socknum), "+r" (__cmd) : : "r25", "r20", "r0"); \
@@ -316,13 +319,31 @@ void __w5100_sock_cmd(uint8_t socknum, uint8_t cmd);
 #define w5100_sock_read_reg_byte(s,r) w5100_read_byte(W5100_SOCK_REGADDR(s,r))
 #define w5100_sock_read_reg_word(s,r) w5100_read_word(W5100_SOCK_REGADDR(s,r))
 #define w5100_sock_read_reg_mem(s,r,v,l) w5100_read_mem(W5100_SOCK_REGADDR(s,r),v,l)
-#define w5100_set_destipaddr(socknum,ipaddr) w5100_write_mem(W5100_SOCK_REGADDR(socknum, dstipaddr), ipaddr, 4)
-#define w5100_set_destport(socknum,port) w5100_write_word(W5100_SOCK_REGADDR(socknum, dstport), port)
-#define w5100_set_desthwaddr(socknum,hwaddr) w5100_write_mem(W5100_SOCK_REGADDR(socknum, dsthwaddr), hwaddr, 6)
+#define w5100_set_destipaddr(socknum,ipaddr) w5100_sock_write_reg_mem(socknum, dstipaddr, ipaddr, 4)
+#define w5100_set_destport(socknum,port) w5100_sock_write_reg_word(socknum, dstport, port)
+#define w5100_set_desthwaddr(socknum,hwaddr) w5100_sock_write_reg_mem(socknum, dsthwaddr, hwaddr, 6)
+#define w5100_sock_status(socknum) w5100_sock_read_reg_byte(socknum,status)
+
+static inline int w5100_get_free_socket() {
+    for (int i = 0; i < 4; i++) {
+        uint8_t mode = w5100_sock_read_reg_byte(i, mode);
+        uint8_t status = w5100_sock_read_reg_byte(i, status);
+        if (mode == W5100_MR_CLOSED || 
+            status == W5100_SOCK_FIN_WAIT ||
+            status == W5100_SOCK_TIME_WAIT ||
+            status == W5100_SOCK_CLOSE_WAIT ||
+            status == W5100_SOCK_LAST_ACK) {
+            w5100_sock_close(i);
+            return i;
+        }
+    }
+
+    return -1;
+}
 
 #define w5100_udp_read(socknum,buf,len,offset) w5100_sock_read(socknum, buf, len, (offset) + 8)
 
-static inline int w5100_udp_peek(uint8_t socknum, struct w5100_udp_packet *packet) {
+static inline int w5100_udp_readheader(uint8_t socknum, struct w5100_udp_packet *packet) {
     if (w5100_sock_rxavail(socknum) != 0) {
         w5100_sock_read(socknum, packet, 8, 0);
         BYTESWAP(&packet->port);
@@ -335,10 +356,10 @@ static inline int w5100_udp_peek(uint8_t socknum, struct w5100_udp_packet *packe
 
 static inline int w5100_udp_try_recv(uint8_t socknum, struct w5100_udp_packet *packet) {
     if (w5100_sock_rxavail(socknum) != 0) {
-        __w5100_sock_rw_mem(socknum, packet, 8, W5100_OP_RECV_RAM, 0);
+        w5100_recv(socknum, packet, 8, 0);
         BYTESWAP(&packet->port);
         BYTESWAP(&packet->len);
-        __w5100_sock_rw_mem(socknum, packet->data, packet->len, W5100_OP_RECV_RAM, 0);
+        w5100_recv(socknum, packet->data, packet->len, 0);
         return 1;
     }
 
@@ -347,10 +368,10 @@ static inline int w5100_udp_try_recv(uint8_t socknum, struct w5100_udp_packet *p
 
 static inline void w5100_udp_end_recv(uint8_t socknum, struct w5100_udp_packet *packet) {
     if (w5100_sock_rxavail(socknum) != 0) {
-        __w5100_sock_rw_mem(socknum, packet, 8, W5100_OP_RECV_RAM, 0);
+        w5100_recv(socknum, packet, 8, 0);
         BYTESWAP(&packet->port);
         BYTESWAP(&packet->len);
-        __w5100_sock_rw_mem(socknum, packet->data, 0, W5100_OP_RECV_RAM, packet->len);
+        w5100_recv(socknum, packet->data, 0, packet->len);
     }
 }
 
@@ -366,7 +387,7 @@ static inline int w5100_udp_recv(uint8_t socknum, struct w5100_udp_packet *packe
 static inline int w5100_udp_wait(uint8_t socknum, struct w5100_udp_packet *packet, int timeout) {
     while (timeout--) {
         if (w5100_sock_rxavail(socknum) != 0) {
-            w5100_udp_peek(socknum, packet);
+            w5100_udp_readheader(socknum, packet);
             return 1;
         }
         _delay_ms(1);
@@ -377,11 +398,11 @@ static inline int w5100_udp_wait(uint8_t socknum, struct w5100_udp_packet *packe
 
 static inline void w5100_udp_bind(uint8_t socknum, uint16_t port) {
     while (1) {
-        w5100_write_byte(W5100_SOCK_REGADDR(socknum, mode), W5100_MR_UDP);
-        w5100_write_word(W5100_SOCK_REGADDR(socknum, srcport), port);
+        w5100_sock_write_reg_byte(socknum, mode, W5100_MR_UDP);
+        w5100_sock_write_reg_word(socknum, srcport, port);
         w5100_sock_cmd(socknum, W5100_CR_OPEN);
 
-        if (w5100_read_byte(W5100_SOCK_REGADDR(socknum, status)) == W5100_SOCK_UDP) {
+        if (w5100_sock_status(socknum) == W5100_SOCK_UDP) {
             break;
         } else {
             w5100_sock_cmd(socknum, W5100_CR_CLOSE);
@@ -397,7 +418,7 @@ static inline int w5100_tcp_try_recv(uint8_t socknum, uint8_t *buf, int maxread,
             rxavail = maxread;
         }
 
-        __w5100_sock_rw_mem(socknum, buf, rxavail, W5100_OP_RECV_RAM, 0);
+        w5100_recv(socknum, buf, rxavail, 0);
         return rxavail;
     }
 
@@ -413,6 +434,60 @@ static inline int w5100_tcp_recv(uint8_t socknum, uint8_t *buf, int maxread, int
 
     return w5100_tcp_try_recv(socknum, buf, maxread, 1);
 }
+
+static inline void w5100_tcp_bind(uint8_t socknum, uint16_t port) {
+    while (1) {
+        w5100_sock_write_reg_byte(socknum, mode, W5100_MR_TCP);
+        w5100_sock_write_reg_word(socknum, srcport, port);
+        w5100_sock_cmd(socknum, W5100_CR_OPEN);
+
+        if (w5100_sock_status(socknum) == W5100_SOCK_INIT) {
+            break;
+        } else {
+            w5100_sock_close(socknum);
+        }
+    }
+}
+
+static inline void w5100_tcp_listen(uint16_t socknum, uint16_t port) {
+    while (1) {
+        w5100_sock_write_reg_byte(socknum, mode, W5100_MR_TCP);
+        w5100_sock_write_reg_word(socknum, srcport, port);
+        w5100_sock_cmd(socknum, W5100_CR_OPEN);
+
+        if (w5100_sock_status(socknum) == W5100_SOCK_INIT) {
+            w5100_sock_cmd(socknum, W5100_CR_LISTEN);
+
+            if (w5100_sock_status(socknum) == W5100_SOCK_LISTEN) {
+                break;
+            }
+        }
+
+        w5100_sock_close(socknum);
+    }
+}
+
+#define w5100_tcp_connected(socknum) (w5100_sock_status(socknum) == W5100_SOCK_ESTABLISHED)
+static inline void w5100_tcp_connect_async(uint8_t socknum, struct ipaddr *ipaddr, uint16_t port) {
+    w5100_set_destipaddr(socknum, ipaddr);
+    w5100_set_destport(socknum, port);
+    w5100_sock_cmd(socknum, W5100_CR_CONNECT);
+}
+
+static inline int w5100_tcp_connect(uint8_t socknum, struct ipaddr *ipaddr, uint16_t port, int timeout) {
+    w5100_tcp_connect_async(socknum, ipaddr, port);
+
+    while (timeout--) {
+        if (w5100_tcp_connected(socknum)) {
+            return 1;
+        }
+    }
+
+    w5100_sock_close(socknum);
+    return 0;
+}
+
+#define w5100_tcp_close(socknum) w5100_sock_cmd(socknum, W5100_CR_DISCON)
 
 #endif /* __ASSEMBLER__ */
 
