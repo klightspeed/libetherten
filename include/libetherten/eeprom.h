@@ -24,5 +24,6 @@ extern struct eeprom_boot_data eeprom_boot_data;
 
 void load_eeprom_data(void);
 void save_eeprom_data(void);
+void init_eeprom_data(void);
 
 #endif
