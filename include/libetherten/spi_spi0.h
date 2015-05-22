@@ -28,7 +28,7 @@
 
 #else /* __ASSEMBLER__ */
 
-static inline void spi_spi0_setup(int div) {
+static inline void spi_spi0_setup_dord(int div, uint8_t dord) {
     uint8_t clkdiv2;
     uint8_t clkdiv;
 
@@ -46,15 +46,19 @@ static inline void spi_spi0_setup(int div) {
     } else if (div == 128) {
         clkdiv = _BV(SPR0) | _BV(SPR1);
     } else {
-        spi_spi0_setup(DEFAULT_SPI_CLK_DIV);
+        spi_spi0_setup_dord(DEFAULT_SPI_CLK_DIV, dord);
         return;
     }
 
     SPCR = 0;
     SPSR = clkdiv2;
-    SPCR = _BV(SPE) | _BV(MSTR) | clkdiv;
+    SPCR = _BV(SPE) | _BV(MSTR) | (dord ? _BV(DORD) : 0) | clkdiv;
     SPI_SPI0_DDR = (SPI_SPI0_DDR & ~_BV(SPI_SPI0_MISO_BIT)) | _BV(SPI_SPI0_MOSI_BIT) | _BV(SPI_SPI0_SCK_BIT);
     SPI_SPI0_PORT |= SPI_SPI0_MISO_BIT;
+}
+
+static inline void spi_spi0_setup(int div) {
+    spi_spi0_setup_dord(div, 0);
 }
 
 #define SPI_SPI0_PORT_SET(b) SPI_SPI0_PORT |= _BV(SPI_SPI0_ ## b ## _BIT)
@@ -67,6 +71,7 @@ static inline void spi_spi0_setup(int div) {
 #define spi_spi0_write(b)    spi_spi0_datareg = (b)
 #define spi_spi0_wait()      asm volatile ("call __spi_spi0_wait")
 #define spi_spi0_read()      spi_spi0_datareg
+#define spi_spi0_transfer(b) ({spi_spi0_write(b); spi_spi0_wait(); spi_spi0_read();})
 
 #endif /* __ASSEMBLER__ */
 
