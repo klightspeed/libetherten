@@ -87,6 +87,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct ipaddr {
     uint8_t octet[4];
 };
@@ -488,6 +492,10 @@ static inline int w5100_tcp_connect(uint8_t socknum, struct ipaddr *ipaddr, uint
 }
 
 #define w5100_tcp_close(socknum) w5100_sock_cmd(socknum, W5100_CR_DISCON)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __ASSEMBLER__ */
 

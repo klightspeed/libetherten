@@ -7,6 +7,10 @@
 #include "w5100.h"
 #include "dhcp.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct eeprom_boot_data {
     uint8_t sig[2];
     uint8_t structlen;
@@ -25,5 +29,9 @@ extern struct eeprom_boot_data eeprom_boot_data;
 void load_eeprom_data(void);
 void save_eeprom_data(void);
 void init_eeprom_data(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

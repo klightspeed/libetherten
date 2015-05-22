@@ -5,10 +5,18 @@
 #include <avr/boot.h>
 #include "flash.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void __flash_write_page(void *pageaddr,void *src,uint16_t valid1,uint16_t valid2);
 
 static inline void flash_write_page(void *pageaddr, void *src) {
     __flash_write_page(pageaddr, src, (uint16_t)pageaddr ^ 0xc0de, (uint16_t)src ^ 0xcafe);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

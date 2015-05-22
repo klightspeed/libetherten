@@ -6,6 +6,10 @@
 #include <avr/wdt.h>
 #include "w5100.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct tftp_packet {
     uint8_t opcode[2];
     union {
@@ -135,5 +139,9 @@ static inline uint8_t tftp_read_block(struct tftp_state *state, uint16_t blknum,
 }
 
 #define tftp_close() w5100_sock_close(2)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
