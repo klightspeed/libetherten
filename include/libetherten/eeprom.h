@@ -24,11 +24,10 @@ struct eeprom_boot_data {
 };
 
 #define EEPROM_BOOT_DATA_START ((void *)0x380)
-extern struct eeprom_boot_data eeprom_boot_data;
 
-void load_eeprom_data(void);
-void save_eeprom_data(void);
-void init_eeprom_data(void);
+void load_eeprom_data(struct eeprom_boot_data *eeprom_boot_data);
+void save_eeprom_data(struct eeprom_boot_data *eeprom_boot_data);
+void init_eeprom_data(struct eeprom_boot_data *eeprom_boot_data);
 
 #ifdef __cplusplus
 }
