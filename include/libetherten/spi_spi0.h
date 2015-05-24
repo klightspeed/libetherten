@@ -28,7 +28,7 @@
 
 #else /* __ASSEMBLER__ */
 
-static inline void spi_spi0_setup_dord(int div, uint8_t dord) {
+static inline __attribute__((__always_inline__)) void spi_spi0_setup_dord(int div, uint8_t dord) {
     uint8_t clkdiv2;
     uint8_t clkdiv;
 
@@ -53,13 +53,13 @@ static inline void spi_spi0_setup_dord(int div, uint8_t dord) {
     SPCR = 0;
     SPSR = clkdiv2;
     SPCR = _BV(SPE) | _BV(MSTR) | (dord ? _BV(DORD) : 0) | clkdiv;
-    SPI_SPI0_DDR = (SPI_SPI0_DDR & ~_BV(SPI_SPI0_MISO_BIT)) | _BV(SPI_SPI0_MOSI_BIT) | _BV(SPI_SPI0_SCK_BIT);
+    SPI_SPI0_DDR &= ~_BV(SPI_SPI0_MISO_BIT);
+    SPI_SPI0_DDR |= _BV(SPI_SPI0_MOSI_BIT);
+    SPI_SPI0_DDR |= _BV(SPI_SPI0_SCK_BIT);
     SPI_SPI0_PORT |= SPI_SPI0_MISO_BIT;
 }
 
-static inline void spi_spi0_setup(int div) {
-    spi_spi0_setup_dord(div, 0);
-}
+#define spi_spi0_setup(div) spi_spi0_setup_dord(div, 0)
 
 #define SPI_SPI0_PORT_SET(b) SPI_SPI0_PORT |= _BV(SPI_SPI0_ ## b ## _BIT)
 #define SPI_SPI0_PORT_CLR(b) SPI_SPI0_PORT &= ~_BV(SPI_SPI0_ ## b ## _BIT)
