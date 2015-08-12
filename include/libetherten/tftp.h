@@ -66,6 +66,13 @@ static inline void tftp_send_ack(struct tftp_state *state, uint16_t blknum, uint
 }
 
 static inline uint8_t tftp_try_get_response(struct tftp_state *state, uint16_t blknum, uint8_t socknum) {
+    uint8_t *buf = (uint8_t *)&state->packet;
+    write_x(buf, 0xFF);
+    write_x(buf, 0xFF);
+    write_x(buf, 0xFF);
+    write_x(buf, 0xFF);
+    state->packetlen = 0;
+
     if (w5100_udp_try_recv(socknum, &state->udppacket)) {
         if (state->packet.opcode[1] == 6) {
             w5100_set_destipaddr(socknum, &state->serverip);
@@ -76,11 +83,13 @@ static inline uint8_t tftp_try_get_response(struct tftp_state *state, uint16_t b
             __blknum.byte[1] = state->packet.blknum[0];
             __blknum.byte[0] = state->packet.blknum[1];
 
-            if (__blknum.word == blknum) {
-                return 1;
-            } else if (__blknum.word < blknum) {
+            if (__blknum.word <= blknum) {
                 state->packet.opcode[1] = 4;
                 w5100_send(socknum, &state->packet, 4, 0);
+
+                if (__blknum.word == blknum) {
+                    return 1;
+                }
             }
         }
     }
@@ -93,7 +102,7 @@ static inline uint8_t tftp_open(struct tftp_state *state, struct ipaddr *ipaddr,
     tftp_init(ipaddr, socknum);
 
     do {
-        uint8_t recvtries = 50;
+        uint8_t recvtries = 100;
 
         wdt_reset();
         tftp_send_rrq(state, filename, socknum);
@@ -114,16 +123,13 @@ static inline uint8_t tftp_read_block(struct tftp_state *state, uint16_t blknum,
     uint8_t retries = 5;
 
     do {
-        uint8_t recvtries = 50;
+        uint8_t recvtries = 100;
         wdt_reset();
-        tftp_send_ack(state, blknum, socknum);
 
         do {
             wdt_reset();
             if (tftp_try_get_response(state, blknum + 1, socknum)) {
                 if (state->packetlen == 4) {
-                    state->packet.opcode[1] = 4;
-                    w5100_send(socknum, &state->packet, 4, 0);
                     w5100_sock_close(socknum);
                     return 0;
                 }
@@ -133,12 +139,14 @@ static inline uint8_t tftp_read_block(struct tftp_state *state, uint16_t blknum,
 
             _delay_ms(10);
         } while (--recvtries);
+
+        tftp_send_ack(state, blknum, socknum);
     } while (--retries);
 
     return 0;
 }
 
-#define tftp_close() w5100_sock_close(2)
+#define tftp_close(socknum) w5100_sock_close(socknum)
 
 #ifdef __cplusplus
 }
