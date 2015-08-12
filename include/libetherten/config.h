@@ -11,5 +11,8 @@
 #define DEFAULT_FW_FILENAME2 "\\Boot\\EtherTen.bin"
 /* #define CONFIG_DHCP_RANDOM_XID */
 #define CONFIG_RANDOM_HWADDR
+#define TFTP_RETRY_PERIOD_MS 1000
+#define TFTP_READ_RETRIES 5
+#define TFTP_OPEN_RETRIES 2
 
 #endif /* CONFIG_H */

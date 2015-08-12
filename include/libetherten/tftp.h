@@ -98,11 +98,11 @@ static inline uint8_t tftp_try_get_response(struct tftp_state *state, uint16_t b
 }
 
 static inline uint8_t tftp_open(struct tftp_state *state, struct ipaddr *ipaddr, char *filename, uint8_t socknum) {
-    uint8_t retries = 2;
+    uint8_t retries = TFTP_OPEN_RETRIES;
     tftp_init(ipaddr, socknum);
 
     do {
-        uint8_t recvtries = 100;
+        uint8_t recvtries = TFTP_RETRY_PERIOD_MS / 10;
 
         wdt_reset();
         tftp_send_rrq(state, filename, socknum);
@@ -120,10 +120,10 @@ static inline uint8_t tftp_open(struct tftp_state *state, struct ipaddr *ipaddr,
 }
 
 static inline uint8_t tftp_read_block(struct tftp_state *state, uint16_t blknum, uint8_t socknum) {
-    uint8_t retries = 5;
+    uint8_t retries = TFTP_READ_RETRIES;
 
     do {
-        uint8_t recvtries = 100;
+        uint8_t recvtries = TFTP_RETRY_PERIOD_MS / 10;
         wdt_reset();
 
         do {
