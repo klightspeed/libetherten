@@ -259,6 +259,17 @@ union fourbyte {
         ); \
     } while (0)
 
+#define memset_x_const(x,v,len) \
+    do { \
+        void *__x = (void *)x; \
+        register uint8_t __len asm("r23") = (len) + 1; \
+        register uint8_t __val asm("r21") = (v); \
+        asm volatile ( \
+            "call __memset_x" \
+            : "+x" (__x), "+r" (__len), "+r" (__val) \
+        ); \
+    } while (0)
+
 #define copy_const_zx(x,z,len) \
     do { \
         register uint8_t __len asm("r23") = (len) + 1; \
