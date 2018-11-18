@@ -169,7 +169,7 @@ struct __attribute__((__packed__)) w5100_regs {
     struct w5100_regs_socket socket[4];
     uint8_t reserved1[0x4000 - 0x0800];
     uint8_t txbuffer[0x2000];
-    uint8_t rxbuffer[0x2000];
+    uint8_t rxbuffer[0];
 };
 
 struct w5100_sock_bufptr {
